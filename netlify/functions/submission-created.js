@@ -19,7 +19,7 @@ function createTransport() {
 }
 
 /* ── EMAIL NOTIFICATION (pour vous) ── */
-function buildNotificationEmail(data) {
+function buildNotificationEmail(data, files) {
   const { nom, tel, email, 'type-client': typeClient, prestation, ville, cp, message } = data;
 
   const rows = [
@@ -32,6 +32,16 @@ function buildNotificationEmail(data) {
     ['Code postal',       cp         || '—'],
     ['Message',           message    || '—'],
   ];
+
+  const fileEntries = Object.entries(files || {});
+  const fichiersHtml = fileEntries.length > 0
+    ? fileEntries.map(([, url]) => {
+        const filename = decodeURIComponent(url.split('/').pop() || url);
+        return `<a href="${url}" style="color:${GOLD};display:block;margin-bottom:4px">📎 ${filename}</a>`;
+      }).join('')
+    : '<em style="color:#666">Aucun fichier joint</em>';
+
+  rows.push(['Fichiers joints', fichiersHtml]);
 
   const rowsHtml = rows.map(([label, value]) => `
     <tr>
@@ -190,7 +200,8 @@ function buildConfirmationEmail(data) {
 exports.handler = async (event) => {
   try {
     const payload = JSON.parse(event.body);
-    const data    = payload.payload?.data || {};
+    const data    = payload.payload?.data  || {};
+    const files   = payload.payload?.files || {};
 
     const transport = createTransport();
 
@@ -201,7 +212,7 @@ exports.handler = async (event) => {
       from:    `"Wonder Construction" <${process.env.SMTP_USER}>`,
       to:      process.env.SMTP_USER,
       subject: `Nouvelle demande de devis — ${data.nom || 'visiteur'} (${data.prestation || '?'})`,
-      html:    buildNotificationEmail(data),
+      html:    buildNotificationEmail(data, files),
     }));
 
     // 2. Confirmation au client (seulement s'il a laissé un email)
