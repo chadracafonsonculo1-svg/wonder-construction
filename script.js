@@ -281,16 +281,56 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── AFFICHAGE DES FICHIERS SÉLECTIONNÉS ──
   var fileInput = document.getElementById('documents');
-  var fileInfo = document.getElementById('file-upload-info');
-  if (fileInput && fileInfo) {
+  var fileInfo  = document.getElementById('file-upload-info');
+  var fileList  = document.getElementById('file-list');
+  var dt        = new DataTransfer();
+
+  function renderFileList() {
+    if (!fileList) return;
+    fileList.innerHTML = '';
+    Array.from(dt.files).forEach(function (f, i) {
+      var li = document.createElement('li');
+      li.className = 'file-list-item';
+      var name = document.createElement('span');
+      name.textContent = f.name;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'file-remove';
+      btn.setAttribute('aria-label', 'Supprimer ' + f.name);
+      btn.textContent = '✕';
+      btn.addEventListener('click', function () {
+        dt.items.remove(i);
+        fileInput.files = dt.files;
+        renderFileList();
+        updateFileInfo();
+      });
+      li.appendChild(name);
+      li.appendChild(btn);
+      fileList.appendChild(li);
+    });
+  }
+
+  function updateFileInfo() {
+    if (!fileInfo) return;
+    var count = dt.files.length;
+    if (count === 0) {
+      fileInfo.textContent = 'Aucun fichier sélectionné';
+    } else {
+      fileInfo.textContent = count === 1 ? '1 fichier ajouté' : count + ' fichiers ajoutés';
+    }
+  }
+
+  if (fileInput) {
     fileInput.addEventListener('change', function () {
-      if (this.files.length === 0) {
-        fileInfo.textContent = 'Aucun fichier sélectionné';
-      } else if (this.files.length === 1) {
-        fileInfo.textContent = this.files[0].name;
-      } else {
-        fileInfo.textContent = this.files.length + ' fichiers sélectionnés';
-      }
+      Array.from(this.files).forEach(function (f) {
+        var exists = Array.from(dt.files).some(function (e) {
+          return e.name === f.name && e.size === f.size;
+        });
+        if (!exists) dt.items.add(f);
+      });
+      fileInput.files = dt.files;
+      renderFileList();
+      updateFileInfo();
     });
   }
 
@@ -341,6 +381,9 @@ form.addEventListener('submit', function (e) {
     // Le client est redirigé vers merci.html après l'envoi.
   });  function succes() {
     form.reset();
+    dt = new DataTransfer();
+    renderFileList();
+    updateFileInfo();
     btnSubmit.disabled = false;
     btnSubmit.textContent = 'Envoyer ma demande →';
     formOk.style.display = 'block';
