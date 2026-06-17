@@ -240,6 +240,11 @@ ul{list-style:none}
 .file-upload-btn:hover{border-color:var(--j);background:rgba(245,194,0,0.08)}
 .file-upload-info{font-size:0.85rem;color:var(--c)}
 .file-hint{display:block;font-size:0.74rem;color:var(--g);margin-top:0.4rem}
+.file-list{list-style:none;margin:0.5rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.35rem}
+.file-list-item{display:flex;align-items:center;justify-content:space-between;gap:0.5rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px;font-size:0.82rem;color:var(--w)}
+.file-list-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-remove{background:none;border:none;color:var(--g);cursor:pointer;font-size:0.85rem;line-height:1;padding:0 2px;transition:color var(--t);flex-shrink:0}
+.file-remove:hover{color:#e24b4a}
 
 /* ════════════════════════════════════════════════════════════
    CARROUSEL D'IMAGES (générique)
