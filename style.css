@@ -414,6 +414,41 @@ footer .logo-text{color:var(--w)}
 .page-cta h3{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:2px;margin-bottom:0.5rem;color:var(--n)}
 .page-cta p{color:var(--g);margin-bottom:1.5rem}
 
+/* ── TÉMOIGNAGES ── */
+.temoignages{background:var(--bg)}
+.temoignages-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+.temoignage-card{background:var(--a);padding:2rem;border-radius:var(--r);border:1px solid var(--line);box-shadow:0 2px 14px rgba(28,32,39,0.06);display:flex;flex-direction:column;gap:1rem;transition:box-shadow var(--t),transform var(--t)}
+.temoignage-card:hover{box-shadow:0 6px 24px rgba(28,32,39,0.1);transform:translateY(-3px)}
+.temoignage-stars{color:var(--j);font-size:1.15rem;letter-spacing:3px;line-height:1}
+.temoignage-text{color:var(--c);font-size:0.9rem;line-height:1.8;flex:1;font-style:italic}
+.temoignage-auteur{display:flex;align-items:center;gap:0.75rem;padding-top:1rem;border-top:1px solid var(--line)}
+.temoignage-avatar{width:44px;height:44px;border-radius:50%;background:var(--j);color:var(--n);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.78rem;flex-shrink:0;letter-spacing:1px}
+.temoignage-auteur strong{display:block;font-size:0.88rem;color:var(--n);font-weight:700}
+.temoignage-auteur span{font-size:0.78rem;color:var(--g)}
+.temoignages-footer{margin-top:2.5rem;display:flex;flex-direction:column;align-items:center;gap:1rem}
+.note-globale{display:inline-flex;align-items:center;gap:0.75rem;background:var(--a);padding:0.9rem 1.75rem;border-radius:var(--r);border:1px solid var(--line);box-shadow:0 2px 8px rgba(28,32,39,0.05)}
+.note-stars{color:var(--j);font-size:1.3rem;letter-spacing:3px;line-height:1}
+.note-score{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--n);letter-spacing:2px}
+.note-sep{color:var(--line);font-size:1.2rem}
+.note-base{font-size:0.8rem;color:var(--g)}
+.btn-avis-google{display:inline-flex;align-items:center;gap:0.5rem;border:1.5px solid var(--line);background:var(--a);color:var(--c);font-size:0.82rem;font-weight:600;padding:10px 22px;border-radius:var(--r);transition:border-color var(--t),color var(--t),box-shadow var(--t);letter-spacing:0.5px}
+.btn-avis-google:hover{border-color:var(--j);color:var(--n);box-shadow:0 4px 12px rgba(245,194,0,0.18)}
+.btn-avis-google svg{flex-shrink:0;stroke:var(--j)}
+
+/* ── CARTE LOCALISATION ── */
+.map-static{display:flex;align-items:center;justify-content:center;position:relative;margin-top:1.75rem;border-radius:var(--r);overflow:hidden;height:220px;background:#0d1017;border:1px solid rgba(245,194,0,0.15);cursor:pointer;text-decoration:none;transition:border-color var(--t)}
+.map-static:hover{border-color:rgba(245,194,0,0.4)}
+.map-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(245,194,0,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(245,194,0,0.05) 1px,transparent 1px);background-size:36px 36px}
+.map-glow{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(245,194,0,0.08) 0%,transparent 65%)}
+.map-static-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:0.75rem;text-align:center}
+.map-pin-wrap{width:52px;height:52px;background:var(--j);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(245,194,0,0.45)}
+.map-pin-wrap svg{transform:rotate(45deg);width:22px;height:22px;stroke:var(--n);stroke-width:2.5}
+.map-addr{display:flex;flex-direction:column;gap:0.2rem}
+.map-addr strong{color:#fff;font-size:0.95rem;font-weight:700;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase}
+.map-addr span{color:rgba(255,255,255,0.45);font-size:0.8rem}
+.map-cta-btn{display:inline-block;background:var(--j);color:var(--n);font-weight:700;font-size:0.72rem;letter-spacing:1.5px;text-transform:uppercase;padding:8px 16px;border-radius:var(--r);transition:background var(--t)}
+.map-static:hover .map-cta-btn{background:var(--jf)}
+
 /* ── RESPONSIVE ── */
 @media(max-width:1024px){
   .services-grid{grid-template-columns:1fr}
@@ -422,6 +457,7 @@ footer .logo-text{color:var(--w)}
   .footer-grid{grid-template-columns:1fr 1fr}
   .chiffres-grid{grid-template-columns:repeat(2,1fr)}
   .partenaires-grid{grid-template-columns:repeat(3,1fr)}
+  .temoignages-grid{grid-template-columns:repeat(2,1fr)}
   .valeurs-grid{grid-template-columns:1fr}
   .certif-grid{grid-template-columns:1fr}
   .fiche-row{grid-template-columns:160px 1fr}
@@ -443,6 +479,8 @@ footer .logo-text{color:var(--w)}
   .footer-grid{grid-template-columns:1fr;gap:2rem}
   .footer-bas-inner{flex-direction:column;align-items:flex-start}
   .partenaires-grid{grid-template-columns:repeat(2,1fr)}
+  .temoignages-grid{grid-template-columns:1fr}
+  .note-globale{flex-wrap:wrap;justify-content:center;text-align:center}
   .fiche-row{grid-template-columns:1fr;gap:0.25rem}
   .fiche-label{margin-bottom:2px}
   .logo-text{font-size:0.85rem;letter-spacing:2px}
