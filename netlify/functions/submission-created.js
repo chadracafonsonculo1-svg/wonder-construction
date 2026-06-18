@@ -18,10 +18,23 @@ exports.handler = async (event) => {
     const GOLD = '#F5C200';
     const DARK = '#1C2027';
 
-    // Liens vers les fichiers uploadés
-    const fileEntries = Object.entries(files);
-    const fichiersHtml = fileEntries.length > 0
-      ? fileEntries.map(([, url]) => {
+    // Netlify met les URLs des fichiers dans data (pas dans files)
+    // On collecte toutes les valeurs qui ressemblent à une URL de fichier
+    const textFields = new Set(['nom','tel','email','type-client','prestation','ville','cp','message','bot-field','form-name']);
+    const fileUrls = [];
+    // D'abord on regarde files (si renseigné)
+    Object.values(files).forEach(v => {
+      if (typeof v === 'string' && v.startsWith('http')) fileUrls.push(v);
+    });
+    // Sinon on cherche dans data les champs qui ne sont pas des champs texte et contiennent une URL
+    if (fileUrls.length === 0) {
+      Object.entries(data).forEach(([k, v]) => {
+        if (!textFields.has(k) && typeof v === 'string' && v.startsWith('http')) fileUrls.push(v);
+      });
+    }
+
+    const fichiersHtml = fileUrls.length > 0
+      ? fileUrls.map(url => {
           const filename = decodeURIComponent(url.split('/').pop() || url);
           return `<a href="${url}" style="color:${GOLD};font-weight:600;display:block;margin-bottom:6px;text-decoration:none">📎 ${filename}</a>`;
         }).join('')
