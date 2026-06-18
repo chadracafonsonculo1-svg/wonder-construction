@@ -1,118 +1,238 @@
-// Déclenchée automatiquement par Netlify Forms à chaque soumission
-// Envoie un email HTML avec liens cliquables via Resend (aucun package npm requis)
+const nodemailer = require('nodemailer');
+
+const LOGO_URL = 'https://wonder-construction.fr/images/logo.jpeg';
+const SITE_URL = 'https://wonder-construction.fr';
+const GOLD    = '#F5C200';
+const DARK    = '#0D0D0D';
+
+/* ── TRANSPORT SMTP ── */
+function createTransport() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST || 'mail.privateemail.com',
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
+
+/* ── EMAIL NOTIFICATION (pour vous) ── */
+function buildNotificationEmail(data, files) {
+  const { nom, tel, email, 'type-client': typeClient, prestation, ville, cp, message } = data;
+
+  const rows = [
+    ['Nom complet',       nom        || '—'],
+    ['Téléphone',         tel        || '—'],
+    ['Email',             email      || '—'],
+    ['Profil client',     typeClient || '—'],
+    ['Prestation',        prestation || '—'],
+    ['Ville du chantier', ville      || '—'],
+    ['Code postal',       cp         || '—'],
+    ['Message',           message    || '—'],
+  ];
+
+  const fileEntries = Object.entries(files || {});
+  const fichiersHtml = fileEntries.length > 0
+    ? fileEntries.map(([, url]) => {
+        const filename = decodeURIComponent(url.split('/').pop() || url);
+        return `<a href="${url}" style="color:${GOLD};display:block;margin-bottom:4px">📎 ${filename}</a>`;
+      }).join('')
+    : '<em style="color:#666">Aucun fichier joint</em>';
+
+  rows.push(['Fichiers joints', fichiersHtml]);
+
+  const rowsHtml = rows.map(([label, value]) => `
+    <tr>
+      <td style="padding:10px 16px;background:#1a1a1a;color:#999;font-size:13px;font-weight:600;white-space:nowrap;border-bottom:1px solid #2a2a2a;width:180px">${label}</td>
+      <td style="padding:10px 16px;background:#111;color:#f0f0f0;font-size:14px;border-bottom:1px solid #2a2a2a">${value}</td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0D0D0D;font-family:'Segoe UI',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;padding:40px 20px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background:${GOLD};padding:28px 32px;border-radius:12px 12px 0 0" align="center">
+            <img src="${LOGO_URL}" alt="Wonder Construction" height="56" style="display:block;margin:0 auto 12px" />
+            <p style="margin:0;color:${DARK};font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase">Nouvelle demande de devis</p>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="background:#161616;padding:32px">
+            <h2 style="margin:0 0 6px;color:#fff;font-size:22px">
+              ${nom || 'Un visiteur'} a soumis une demande
+            </h2>
+            <p style="margin:0 0 24px;color:#888;font-size:14px">
+              Reçu le ${new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+            </p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid #2a2a2a">
+              ${rowsHtml}
+            </table>
+
+            ${email ? `
+            <div style="margin-top:28px;text-align:center">
+              <a href="mailto:${email}?subject=Votre devis Wonder Construction"
+                 style="display:inline-block;background:${GOLD};color:${DARK};font-weight:700;font-size:14px;letter-spacing:1px;text-decoration:none;padding:13px 28px;border-radius:8px">
+                ✉ Répondre à ${nom || 'ce client'}
+              </a>
+            </div>` : ''}
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background:#0D0D0D;padding:20px 32px;border-top:1px solid #2a2a2a;border-radius:0 0 12px 12px" align="center">
+            <p style="margin:0;color:#555;font-size:12px">
+              SAS Wonder Construction — <a href="${SITE_URL}" style="color:${GOLD};text-decoration:none">wonder-construction.fr</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/* ── EMAIL CONFIRMATION (pour le client) ── */
+function buildConfirmationEmail(data) {
+  const { nom, prestation, ville } = data;
+  const prenom = (nom || '').split(' ')[0] || 'Madame/Monsieur';
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background:${DARK};padding:28px 32px;border-radius:12px 12px 0 0" align="center">
+            <img src="${LOGO_URL}" alt="Wonder Construction" height="56" style="display:block;margin:0 auto 12px" />
+            <div style="width:48px;height:2px;background:${GOLD};margin:0 auto 12px"></div>
+            <p style="margin:0;color:${GOLD};font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase">Confirmation de demande</p>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="background:#fff;padding:36px 32px">
+
+            <h1 style="margin:0 0 8px;color:${DARK};font-size:24px;font-weight:700">
+              Merci ${prenom}&nbsp;!
+            </h1>
+            <p style="margin:0 0 24px;color:#555;font-size:15px;line-height:1.6">
+              Votre demande de devis a bien été reçue. Notre équipe l'étudie et vous recontactera dans les <strong>24&nbsp;heures</strong> pour faire le point sur votre projet.
+            </p>
+
+            <!-- RECAP -->
+            <div style="background:#f9f9f9;border-left:4px solid ${GOLD};border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:28px">
+              <p style="margin:0 0 6px;color:#999;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase">Récapitulatif</p>
+              ${prestation ? `<p style="margin:4px 0;color:${DARK};font-size:14px"><strong>Prestation :</strong> ${prestation}</p>` : ''}
+              ${ville     ? `<p style="margin:4px 0;color:${DARK};font-size:14px"><strong>Localisation :</strong> ${ville}</p>` : ''}
+              <p style="margin:4px 0;color:${DARK};font-size:14px"><strong>Délai de réponse :</strong> Sous 24&nbsp;h</p>
+            </div>
+
+            <p style="margin:0 0 28px;color:#555;font-size:14px;line-height:1.6">
+              En attendant, n'hésitez pas à nous contacter directement si votre demande est urgente :
+            </p>
+
+            <!-- CONTACT -->
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:28px">
+              <tr>
+                <td style="padding:0 8px 0 0">
+                  <a href="tel:+33781389994"
+                     style="display:inline-block;background:${DARK};color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px">
+                    📞 07 81 38 99 94
+                  </a>
+                </td>
+                <td>
+                  <a href="mailto:contact@wonder-construction.fr"
+                     style="display:inline-block;background:${GOLD};color:${DARK};font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px">
+                    ✉ Nous écrire
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0;color:#999;font-size:13px;line-height:1.5">
+              Cordialement,<br>
+              <strong style="color:${DARK}">L'équipe Wonder Construction</strong>
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background:#f0f0f0;padding:20px 32px;border-radius:0 0 12px 12px;border-top:1px solid #e0e0e0" align="center">
+            <p style="margin:0 0 6px;color:#888;font-size:12px">
+              SAS Wonder Construction — Spécialiste montage &amp; démontage d'échafaudages
+            </p>
+            <p style="margin:0;font-size:12px">
+              <a href="${SITE_URL}" style="color:${GOLD};text-decoration:none">wonder-construction.fr</a>
+              &nbsp;|&nbsp;
+              <a href="${SITE_URL}/politique-confidentialite.html" style="color:#999;text-decoration:none">Politique de confidentialité</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/* ── HANDLER PRINCIPAL ── */
 exports.handler = async (event) => {
+  console.log('submission-created triggered');
   try {
     const payload = JSON.parse(event.body);
     const data    = payload.payload?.data  || {};
     const files   = payload.payload?.files || {};
 
-    const nom        = data.nom            || 'Non renseigné';
-    const tel        = data.tel            || 'Non renseigné';
-    const email      = data.email          || '';
-    const typeClient = data['type-client'] || 'Non renseigné';
-    const prestation = data.prestation     || 'Non renseigné';
-    const ville      = data.ville          || '';
-    const cp         = data.cp             || '';
-    const message    = data.message        || '';
+    console.log('Form data received:', JSON.stringify({ nom: data.nom, email: data.email, prestation: data.prestation }));
 
-    const GOLD = '#F5C200';
-    const DARK = '#1C2027';
+    const transport = createTransport();
+    const emails = [];
 
-    // Netlify met les URLs des fichiers dans data (pas dans files)
-    // On collecte toutes les valeurs qui ressemblent à une URL de fichier
-    const textFields = new Set(['nom','tel','email','type-client','prestation','ville','cp','message','bot-field','form-name']);
-    const fileUrls = [];
-    // D'abord on regarde files (si renseigné)
-    Object.values(files).forEach(v => {
-      if (typeof v === 'string' && v.startsWith('http')) fileUrls.push(v);
-    });
-    // Sinon on cherche dans data les champs qui ne sont pas des champs texte et contiennent une URL
-    if (fileUrls.length === 0) {
-      Object.entries(data).forEach(([k, v]) => {
-        if (!textFields.has(k) && typeof v === 'string' && v.startsWith('http')) fileUrls.push(v);
-      });
+    // 1. Notification au propriétaire
+    emails.push(transport.sendMail({
+      from:    `"Wonder Construction" <${process.env.SMTP_USER}>`,
+      to:      process.env.SMTP_USER,
+      subject: `Nouvelle demande de devis — ${data.nom || 'visiteur'} (${data.prestation || '?'})`,
+      html:    buildNotificationEmail(data, files),
+    }));
+
+    // 2. Confirmation au client (seulement s'il a laissé un email)
+    if (data.email && data.email.includes('@')) {
+      emails.push(transport.sendMail({
+        from:    `"Wonder Construction" <${process.env.SMTP_USER}>`,
+        to:      data.email,
+        subject: 'Votre demande de devis a bien été reçue — Wonder Construction',
+        html:    buildConfirmationEmail(data),
+      }));
     }
 
-    const fichiersHtml = fileUrls.length > 0
-      ? fileUrls.map(url => {
-          const filename = decodeURIComponent(url.split('/').pop() || url);
-          return `<a href="${url}" style="color:${GOLD};font-weight:600;display:block;margin-bottom:6px;text-decoration:none">📎 ${filename}</a>`;
-        }).join('')
-      : '<em style="color:#888">Aucun fichier joint</em>';
-
-    const rows = [
-      ['Nom',             `<strong>${nom}</strong>`],
-      ['Téléphone',       `<a href="tel:${tel}" style="color:${DARK};font-weight:700;text-decoration:none">${tel}</a>`],
-      ...(email ? [['Email', `<a href="mailto:${email}" style="color:#D9A900;text-decoration:none">${email}</a>`]] : []),
-      ['Profil',          typeClient],
-      ['Prestation',      `<span style="background:${GOLD};color:${DARK};padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px">${prestation}</span>`],
-      ...((ville || cp) ? [['Localisation', [ville, cp].filter(Boolean).join(' — ')]] : []),
-      ...(message ? [['Description', `<span style="white-space:pre-wrap">${message}</span>`]] : []),
-      ['Fichiers joints', fichiersHtml],
-    ];
-
-    const rowsHtml = rows.map(([label, value], i) => `
-      <tr style="background:${i % 2 === 0 ? '#FAF7F0' : '#fff'}">
-        <td style="padding:11px 16px;color:#666;width:160px;font-size:13px;font-weight:600;border-bottom:1px solid #eee;vertical-align:top">${label}</td>
-        <td style="padding:11px 16px;font-size:14px;border-bottom:1px solid #eee">${value}</td>
-      </tr>`).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif">
-  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.12)">
-
-    <div style="background:${DARK};padding:28px 32px;text-align:center">
-      <img src="https://wonder-construction.fr/images/logo.jpeg" alt="Wonder Construction" height="60" style="display:block;margin:0 auto 14px;border-radius:4px"/>
-      <h1 style="color:${GOLD};margin:0;font-size:22px;letter-spacing:1px">WONDER CONSTRUCTION</h1>
-      <p style="color:#fff;margin:6px 0 0;font-size:13px;opacity:0.7">Nouvelle demande de devis</p>
-    </div>
-
-    <div style="padding:28px 32px">
-      <table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;border:1px solid #eee">
-        ${rowsHtml}
-      </table>
-      <div style="margin-top:24px;text-align:center">
-        <a href="tel:${tel}" style="display:inline-block;background:${GOLD};color:${DARK};padding:13px 32px;border-radius:6px;font-weight:700;font-size:15px;text-decoration:none">
-          📞 Rappeler ${nom}
-        </a>
-      </div>
-    </div>
-
-    <div style="background:#f5f5f5;padding:14px 32px;text-align:center;font-size:12px;color:#aaa">
-      Reçu via <a href="https://wonder-construction.fr" style="color:#D9A900;text-decoration:none">wonder-construction.fr</a>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    const notifyEmail = process.env.NOTIFY_EMAIL || 'contact@wonder-construction.fr';
-
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from:     'Wonder Construction <devis@wonder-construction.fr>',
-        to:       [notifyEmail],
-        reply_to: email || undefined,
-        subject:  `Nouveau devis — ${nom} · ${prestation}`,
-        html,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('Resend error:', err);
-      return { statusCode: 500, body: 'Email send failed' };
-    }
+    await Promise.all(emails);
+    console.log('Emails sent successfully');
 
     return { statusCode: 200, body: 'OK' };
   } catch (err) {
-    console.error('Function error:', err);
+    console.error('Email error:', err.message);
     return { statusCode: 500, body: err.message };
   }
 };
