@@ -1,5 +1,14 @@
-// Reçoit le formulaire de devis directement (sans Netlify Forms)
-// Parse multipart/form-data, envoie un email HTML + pièces jointes via Resend
+const { getStore } = require('@netlify/blobs');
+const nodemailer  = require('nodemailer');
+
+function createTransport() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST || 'mail.privateemail.com',
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
 
 function indexOf(hay, needle, start = 0) {
   outer: for (let i = start; i <= hay.length - needle.length; i++) {
@@ -26,7 +35,7 @@ function parseMultipart(body, isBase64, contentType) {
     const bpos = indexOf(buf, boundary, pos);
     if (bpos === -1) break;
     pos = bpos + boundary.length;
-    if (buf[pos] === 0x2D && buf[pos + 1] === 0x2D) break; // --boundary--
+    if (buf[pos] === 0x2D && buf[pos + 1] === 0x2D) break;
     if (buf[pos] === 0x0D && buf[pos + 1] === 0x0A) pos += 2;
 
     const hEnd = indexOf(buf, CRLFCRLF, pos);
@@ -39,9 +48,9 @@ function parseMultipart(body, isBase64, contentType) {
     const part = buf.slice(pos, nextB - 2);
     pos = nextB;
 
-    const nameM     = headers.match(/name="([^"]+)"/i);
-    const fileM     = headers.match(/filename="([^"]*)"/i);
-    const ctM       = headers.match(/Content-Type:\s*([^\r\n]+)/i);
+    const nameM = headers.match(/name="([^"]+)"/i);
+    const fileM = headers.match(/filename="([^"]*)"/i);
+    const ctM   = headers.match(/Content-Type:\s*([^\r\n]+)/i);
     if (!nameM) continue;
 
     if (fileM && fileM[1]) {
@@ -49,6 +58,7 @@ function parseMultipart(body, isBase64, contentType) {
         filename:    fileM[1],
         contentType: ctM ? ctM[1].trim() : 'application/octet-stream',
         content:     part.toString('base64'),
+        buffer:      part,
       });
     } else {
       fields[nameM[1]] = part.toString('utf8');
@@ -81,6 +91,46 @@ exports.handler = async (event) => {
   const cp         = fields.cp              || '';
   const message    = fields.message         || '';
 
+  // Upload files to Netlify Blobs and generate download links
+  const fileLinks = [];
+  if (files.length > 0) {
+    try {
+      const siteID = process.env.SITE_ID || process.env.NETLIFY_SITE_ID;
+      const token  = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+      console.log('Blob config — siteID:', siteID, 'token present:', !!token, 'NETLIFY_BLOBS_TOKEN present:', !!process.env.NETLIFY_BLOBS_TOKEN);
+      const storeOpts = { name: 'devis-uploads' };
+      if (siteID) storeOpts.siteID = siteID;
+      if (token)  storeOpts.token  = token;
+      const store = getStore(storeOpts);
+      for (const file of files) {
+        const key = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.filename}`;
+        console.log('Uploading blob key:', key, 'size:', file.buffer.length);
+        await store.set(key, file.buffer, {
+          metadata: { filename: file.filename, contentType: file.contentType },
+        });
+        console.log('Blob uploaded successfully:', key);
+        const siteUrl = process.env.URL || 'https://wonder-construction.fr';
+        const downloadUrl = `${siteUrl}/.netlify/functions/download?key=${encodeURIComponent(key)}`;
+        fileLinks.push({ filename: file.filename, url: downloadUrl });
+      }
+    } catch (err) {
+      console.error('Blob upload error:', err.message, err.stack);
+    }
+  }
+
+  // Build the files row: clickable links if uploaded, fallback to filename
+  let fichiersHtml;
+  if (fileLinks.length > 0) {
+    fichiersHtml = fileLinks.map(f =>
+      `<a href="${f.url}" style="color:${GOLD};font-weight:700;text-decoration:none;display:block;margin-bottom:6px">` +
+      `📎 ${f.filename}</a>`
+    ).join('');
+  } else if (files.length > 0) {
+    fichiersHtml = files.map(f => `<strong>📎 ${f.filename}</strong>`).join('<br>');
+  } else {
+    fichiersHtml = null;
+  }
+
   const rows = [
     ['Nom',        `<strong>${nom}</strong>`],
     ['Téléphone',  `<a href="tel:${tel}" style="color:${DARK};font-weight:700;text-decoration:none">${tel}</a>`],
@@ -89,7 +139,7 @@ exports.handler = async (event) => {
     ['Prestation', `<span style="background:${GOLD};color:${DARK};padding:2px 10px;border-radius:4px;font-weight:700;font-size:13px">${prestation}</span>`],
     ...((ville || cp) ? [['Localisation', [ville, cp].filter(Boolean).join(' — ')]] : []),
     ...(message ? [['Description', `<span style="white-space:pre-wrap">${message}</span>`]] : []),
-    ...(files.length ? [['Fichiers joints', files.map(f => `<strong>📎 ${f.filename}</strong>`).join('<br>')]] : []),
+    ...(fichiersHtml ? [['Fichiers joints', fichiersHtml]] : []),
   ];
 
   const rowsHtml = rows.map(([label, value], i) => `
@@ -125,22 +175,88 @@ exports.handler = async (event) => {
 </body>
 </html>`;
 
-  const payload = {
-    from:     'Wonder Construction <devis@wonder-construction.fr>',
-    to:       [process.env.NOTIFY_EMAIL || 'contact@wonder-construction.fr'],
-    subject:  `Nouveau devis — ${nom} · ${prestation}`,
+  const transport = createTransport();
+  const notifyTo  = process.env.SMTP_USER || 'contact@wonder-construction.fr';
+  const sendJobs  = [];
+
+  // 1. Notification au propriétaire
+  sendJobs.push(transport.sendMail({
+    from:     `"Wonder Construction" <${notifyTo}>`,
+    to:       notifyTo,
+    replyTo:  email || undefined,
+    subject:  `Nouvelle demande de devis — ${nom} · ${prestation}`,
     html,
-    ...(files.length ? { attachments: files.map(f => ({ filename: f.filename, content: f.content })) } : {}),
-  };
-  if (email) payload.reply_to = email;
+    ...(files.length ? { attachments: files.map(f => ({ filename: f.filename, content: f.content, encoding: 'base64' })) } : {}),
+  }));
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
-    body:    JSON.stringify(payload),
-  });
+  // 2. Confirmation au client
+  if (email && email.includes('@')) {
+    const GOLD2 = '#F5C200';
+    const DARK2 = '#0D0D0D';
+    const prenom = nom.split(' ')[0] || 'Madame/Monsieur';
+    const confirmHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:40px 20px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+        <tr>
+          <td style="background:${DARK2};padding:28px 32px;border-radius:12px 12px 0 0" align="center">
+            <img src="https://wonder-construction.fr/images/logo.jpeg" alt="Wonder Construction" height="56" style="display:block;margin:0 auto 12px;border-radius:4px"/>
+            <div style="width:48px;height:2px;background:${GOLD2};margin:0 auto 12px"></div>
+            <p style="margin:0;color:${GOLD2};font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase">Confirmation de demande</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#fff;padding:36px 32px">
+            <h1 style="margin:0 0 8px;color:${DARK2};font-size:24px;font-weight:700">Merci ${prenom}&nbsp;!</h1>
+            <p style="margin:0 0 24px;color:#555;font-size:15px;line-height:1.6">
+              Votre demande de devis a bien été reçue. Notre équipe l'étudie et vous recontactera dans les <strong>24&nbsp;heures</strong>.
+            </p>
+            <div style="background:#f9f9f9;border-left:4px solid ${GOLD2};border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:28px">
+              <p style="margin:0 0 6px;color:#999;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase">Récapitulatif</p>
+              ${prestation ? `<p style="margin:4px 0;color:${DARK2};font-size:14px"><strong>Prestation :</strong> ${prestation}</p>` : ''}
+              ${ville      ? `<p style="margin:4px 0;color:${DARK2};font-size:14px"><strong>Localisation :</strong> ${ville}</p>` : ''}
+              <p style="margin:4px 0;color:${DARK2};font-size:14px"><strong>Délai de réponse :</strong> Sous 24&nbsp;h</p>
+            </div>
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:28px">
+              <tr>
+                <td style="padding:0 8px 0 0">
+                  <a href="tel:+33781389994" style="display:inline-block;background:${DARK2};color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px">📞 07 81 38 99 94</a>
+                </td>
+                <td>
+                  <a href="mailto:contact@wonder-construction.fr" style="display:inline-block;background:${GOLD2};color:${DARK2};font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px">✉ Nous écrire</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0;color:#999;font-size:13px;line-height:1.5">Cordialement,<br><strong style="color:${DARK2}">L'équipe Wonder Construction</strong></p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f0f0f0;padding:20px 32px;border-radius:0 0 12px 12px;border-top:1px solid #e0e0e0" align="center">
+            <p style="margin:0;color:#888;font-size:12px">SAS Wonder Construction — <a href="https://wonder-construction.fr" style="color:${GOLD2};text-decoration:none">wonder-construction.fr</a></p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+    sendJobs.push(transport.sendMail({
+      from:    `"Wonder Construction" <${notifyTo}>`,
+      to:      email,
+      subject: 'Votre demande de devis a bien été reçue — Wonder Construction',
+      html:    confirmHtml,
+    }));
+  }
 
-  if (!res.ok) console.error('Resend error:', await res.text());
+  try {
+    await Promise.all(sendJobs);
+    console.log('Emails sent OK');
+  } catch (err) {
+    console.error('Email error:', err.message);
+  }
 
   return {
     statusCode: 302,
