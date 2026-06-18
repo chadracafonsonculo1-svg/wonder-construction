@@ -528,9 +528,7 @@
         </div>
       </div>
 
-      <form id="form-devis" name="form-devis" method="POST" action="/merci.html" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-  <p style="display:none"><label>Ne pas remplir : <input name="bot-field" /></label></p>
-  <input type="hidden" name="form-name" value="form-devis" />
+      <form id="form-devis" name="form-devis" method="POST" action="/.netlify/functions/devis" enctype="multipart/form-data" novalidate>
         <div class="form-row">
           <div class="form-group">
             <label for="nom">Nom complet *</label>
@@ -592,7 +590,7 @@
             <span class="file-upload-info" id="file-upload-info">Aucun fichier sélectionné</span>
           </div>
           <ul class="file-list" id="file-list"></ul>
-          <span class="file-hint">PDF, JPG ou PNG — 10 Mo max par fichier</span>
+          <span class="file-hint">PDF, JPG ou PNG — 4 Mo max par fichier</span>
         </div>
         <div class="form-group form-rgpd">
           <input type="checkbox" id="rgpd" required />
