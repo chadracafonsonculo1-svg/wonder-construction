@@ -154,9 +154,9 @@ function buildConfirmationEmail(data) {
             <table cellpadding="0" cellspacing="0" style="margin-bottom:28px">
               <tr>
                 <td style="padding:0 8px 0 0">
-                  <a href="tel:+33781389994"
+                  <a href="tel:+33668648688"
                      style="display:inline-block;background:${DARK};color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px">
-                    📞 07 81 38 99 94
+                    📞 06 68 64 86 88
                   </a>
                 </td>
                 <td>
